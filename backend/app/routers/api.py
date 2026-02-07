@@ -382,14 +382,19 @@ async def get_github_repo_info(repo_url: str, request: Request, db: Session = De
         )
         languages = langs_resp.json() if langs_resp.status_code == 200 else {}
         
-        # Calculate repo size in human readable format
-        size_kb = repo_data.get("size", 0)
-        if size_kb < 1024:
-            size_str = f"{size_kb} KB"
-        elif size_kb < 1024 * 1024:
-            size_str = f"{size_kb / 1024:.1f} MB"
+        # Calculate total bytes from languages (more accurate than repo size)
+        total_bytes = sum(languages.values()) if languages else 0
+        
+        # Estimate lines of code (average ~40 bytes per line)
+        estimated_lines = total_bytes // 40 if total_bytes > 0 else 0
+        
+        # Format lines display
+        if estimated_lines < 1000:
+            lines_display = f"{estimated_lines}"
+        elif estimated_lines < 1000000:
+            lines_display = f"{estimated_lines / 1000:.1f}K"
         else:
-            size_str = f"{size_kb / (1024 * 1024):.2f} GB"
+            lines_display = f"{estimated_lines / 1000000:.1f}M"
         
         return JSONResponse(content={
             "name": repo_data.get("name"),
@@ -402,8 +407,9 @@ async def get_github_repo_info(repo_url: str, request: Request, db: Session = De
             "open_issues": repo_data.get("open_issues_count"),
             "language": repo_data.get("language"),
             "languages": languages,
-            "size": size_kb,
-            "size_display": size_str,
+            "total_bytes": total_bytes,
+            "lines_of_code": estimated_lines,
+            "lines_display": lines_display,
             "created_at": repo_data.get("created_at"),
             "updated_at": repo_data.get("updated_at"),
             "pushed_at": repo_data.get("pushed_at"),

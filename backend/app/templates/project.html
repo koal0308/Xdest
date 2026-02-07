@@ -635,8 +635,8 @@ function renderOverview(el, data) {
                 </h3>
                 <div class="space-y-2 text-sm">
                     <div class="flex justify-between">
-                        <span class="text-gray-400">Size</span>
-                        <span>${data.size_display || formatBytes(data.size || 0)}</span>
+                        <span class="text-gray-400">Lines of Code</span>
+                        <span class="font-mono">${data.lines_display || '0'}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-400">Default Branch</span>
