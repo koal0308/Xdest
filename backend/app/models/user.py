@@ -15,6 +15,7 @@ class User(Base):
     github_token = Column(String(500), nullable=True)  # GitHub OAuth Token für API Zugriff
     provider = Column(String(50), nullable=False)  # github, google
     provider_id = Column(String(255), nullable=False)
+    role = Column(String(50), default="developer")  # developer (GitHub) oder tester (Google)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     projects = relationship("Project", back_populates="owner")

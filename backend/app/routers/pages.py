@@ -105,6 +105,10 @@ async def create_project_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/", status_code=302)
     
+    # Testers cannot create projects
+    if user.role == "tester":
+        return RedirectResponse(url="/dashboard", status_code=302)
+    
     return templates.TemplateResponse("create_project.html", {
         "request": request,
         "user": user

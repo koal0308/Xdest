@@ -100,6 +100,10 @@ async def create_project(
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
+    # Check if user is a tester (Google auth) - they cannot create projects
+    if user.role == "tester":
+        raise HTTPException(status_code=403, detail="Testers cannot create projects. Sign in with GitHub to become a developer.")
+    
     image_url = None
     if image and image.filename:
         if image.content_type not in ALLOWED_IMAGE_TYPES:

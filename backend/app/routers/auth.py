@@ -61,7 +61,8 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
             github_token=token['access_token'],
             bio=github_user.get('bio'),
             provider="github",
-            provider_id=str(github_user['id'])
+            provider_id=str(github_user['id']),
+            role="developer"  # GitHub users are developers
         )
         db.add(user)
         db.commit()
@@ -114,7 +115,8 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             email=user_info.get('email'),
             avatar=user_info.get('picture'),
             provider="google",
-            provider_id=str(user_info['sub'])
+            provider_id=str(user_info['sub']),
+            role="tester"  # Google users are testers (cannot create projects)
         )
         db.add(user)
         db.commit()
