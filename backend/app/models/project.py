@@ -14,6 +14,9 @@ class Project(Base):
     github_url = Column(String(500), nullable=True)
     image = Column(String(500), nullable=True)
     tags = Column(String(500), nullable=True)  # comma separated
+    google_analytics_id = Column(String(50), nullable=True)  # z.B. G-XXXXXXXXXX
+    plausible_domain = Column(String(200), nullable=True)  # z.B. myproject.com
+    plausible_api_key = Column(String(100), nullable=True)  # Plausible API Key für Stats
     created_at = Column(DateTime, default=datetime.utcnow)
     
     owner = relationship("User", back_populates="projects")

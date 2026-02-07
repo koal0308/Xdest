@@ -22,8 +22,8 @@ class Issue(Base):
     __tablename__ = "issues"
     
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Wer hat es gemeldet
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # Kann NULL sein wenn Projekt gelöscht
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Kann NULL sein wenn User gelöscht
     
     title = Column(String(300), nullable=False)
     description = Column(Text, nullable=False)
@@ -54,8 +54,8 @@ class IssueResponse(Base):
     __tablename__ = "issue_responses"
     
     id = Column(Integer, primary_key=True, index=True)
-    issue_id = Column(Integer, ForeignKey("issues.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    issue_id = Column(Integer, ForeignKey("issues.id"), nullable=True)  # Kann NULL sein wenn Issue gelöscht
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Kann NULL sein wenn User gelöscht
     
     content = Column(Text, nullable=False)
     helpful_count = Column(Integer, default=0)  # Anzahl der "Hilfreich" Votes

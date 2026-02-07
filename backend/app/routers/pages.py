@@ -126,7 +126,7 @@ async def edit_profile_page(request: Request, db: Session = Depends(get_db)):
     })
 
 @router.get("/explore", response_class=HTMLResponse)
-async def explore_page(request: Request, category: Optional[str] = None, db: Session = Depends(get_db)):
+async def explore_page(request: Request, category: Optional[str] = None, q: Optional[str] = None, db: Session = Depends(get_db)):
     user = await get_current_user_optional(request, db)
     
     # Developer categories
@@ -146,6 +146,20 @@ async def explore_page(request: Request, category: Optional[str] = None, db: Ses
     # Base query for posts with projects
     posts_query = db.query(Post).join(Project).join(User, Post.user_id == User.id)
     
+    # Base query for projects
+    projects_query = db.query(Project)
+    
+    # Search filter
+    search_query = q.strip() if q else None
+    if search_query:
+        search_filter = or_(
+            Project.name.ilike(f"%{search_query}%"),
+            Project.description.ilike(f"%{search_query}%"),
+            Project.tags.ilike(f"%{search_query}%")
+        )
+        posts_query = posts_query.filter(search_filter)
+        projects_query = projects_query.filter(search_filter)
+    
     # Filter by category if selected
     active_category = None
     if category:
@@ -155,10 +169,11 @@ async def explore_page(request: Request, category: Optional[str] = None, db: Ses
                 # Filter posts where project tags contain any of the category tags
                 tag_filters = [Project.tags.ilike(f"%{tag}%") for tag in cat["tags"]]
                 posts_query = posts_query.filter(or_(*tag_filters))
+                projects_query = projects_query.filter(or_(*tag_filters))
                 break
     
     posts = posts_query.order_by(Post.created_at.desc()).limit(50).all()
-    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    projects = projects_query.order_by(Project.created_at.desc()).all()
     
     return templates.TemplateResponse("explore.html", {
         "request": request,
@@ -167,7 +182,8 @@ async def explore_page(request: Request, category: Optional[str] = None, db: Ses
         "posts": posts,
         "categories": categories,
         "active_category": active_category,
-        "current_category": category
+        "current_category": category,
+        "search_query": search_query
     })
 
 @router.get("/leaderboard", response_class=HTMLResponse)

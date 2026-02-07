@@ -36,8 +36,8 @@
         <!-- Header -->
         <div class="text-center mb-12">
             <h1 class="text-4xl font-bold mb-4">🏆 Leaderboard</h1>
-            <p class="text-gray-400 text-lg">Die hilfreichsten Community-Mitglieder</p>
-            <p class="text-sm text-gray-500 mt-2">Punkte: Lösung markiert = 10 Punkte | Hilfreich-Vote = 1 Punkt</p>
+            <p class="text-gray-400 text-lg">The most helpful members</p>
+            <p class="text-sm text-gray-500 mt-2">Points: Solution marked = 10 points | Helpful vote = 1 point</p>
         </div>
 
         <!-- Top 3 Podium -->
@@ -48,14 +48,14 @@
         <!-- Full Leaderboard -->
         <div class="bg-dark-100 rounded-xl border border-gray-800 overflow-hidden">
             <div class="p-4 border-b border-gray-800 bg-dark-200">
-                <h2 class="font-semibold">Komplettes Ranking</h2>
+                <h2 class="font-semibold">Complete Ranking</h2>
             </div>
             
             <div id="leaderboard-list">
                 <!-- Loading State -->
                 <div class="p-8 text-center text-gray-500" id="loading">
                     <div class="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    Lade Leaderboard...
+                    Loading leaderboard...
                 </div>
             </div>
         </div>
@@ -63,48 +63,62 @@
         <!-- Info Box -->
         <div class="mt-8 bg-dark-100 rounded-xl border border-gray-800 p-6">
             <h3 class="font-semibold mb-3 flex items-center gap-2">
-                <span class="text-xl">💡</span> Wie sammelt man Punkte?
+                <span class="text-xl">💡</span> How to earn points?
             </h3>
             <div class="grid md:grid-cols-2 gap-4 text-gray-400 text-sm">
                 <div class="flex items-start gap-3">
                     <span class="text-green-400 text-lg">✅</span>
                     <div>
-                        <p class="font-medium text-white">Lösung markiert (+10 Punkte)</p>
-                        <p>Wenn der Issue-Ersteller deine Antwort als Lösung markiert</p>
+                        <p class="font-medium text-white">Solution marked (+10 points)</p>
+                        <p>When the issue creator marks your answer as the solution</p>
                     </div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-blue-400 text-lg">👍</span>
                     <div>
-                        <p class="font-medium text-white">Hilfreich-Vote (+1 Punkt)</p>
-                        <p>Wenn andere User deine Antwort oder dein Issue als hilfreich markieren</p>
+                        <p class="font-medium text-white">Helpful vote (+1 point)</p>
+                        <p>When other users mark your answer or issue as helpful</p>
                     </div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 text-lg">🐙</span>
                     <div>
-                        <p class="font-medium text-white">GitHub 👍 Reaction (+2 Punkte)</p>
-                        <p>Wenn dein Issue auf GitHub mit 👍 reagiert wird</p>
+                        <p class="font-medium text-white">GitHub 👍 Reaction (+2 points)</p>
+                        <p>When your issue gets a 👍 reaction on GitHub</p>
                     </div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-red-400 text-lg">👎</span>
                     <div>
-                        <p class="font-medium text-white">GitHub 👎 Reaction (-1 Punkt)</p>
-                        <p>Wenn dein Issue auf GitHub mit 👎 reagiert wird</p>
+                        <p class="font-medium text-white">GitHub 👎 Reaction (-1 point)</p>
+                        <p>When your issue gets a 👎 reaction on GitHub</p>
                     </div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-yellow-400 text-lg">⭐</span>
                     <div>
-                        <p class="font-medium text-white">5-Sterne-Bewertung (+0.5 Punkte)</p>
-                        <p>Wenn andere User dich mit 5 Sternen bewerten</p>
+                        <p class="font-medium text-white">5-Star rating (+0.5 points)</p>
+                        <p>When other users rate you with 5 stars</p>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 </div>
+
+<!-- Footer -->
+<footer class="border-t border-gray-800 bg-gray-950 py-4 px-6 mt-8">
+    <div class="max-w-7xl mx-auto flex justify-between items-center text-xs text-gray-500">
+        <span>© 2026 Xdest</span>
+        <div class="flex gap-4">
+            <a href="mailto:aiandfriends@gmail.com" class="hover:text-gray-300 transition">Contact</a>
+            <a href="https://x.com/karlbeis" target="_blank" class="hover:text-gray-300 transition">𝕏 @karlbeis</a>
+            <a href="/privacy" class="hover:text-gray-300 transition">Privacy</a>
+            <a href="/terms" class="hover:text-gray-300 transition">Terms</a>
+            <a href="https://github.com/koal0308/Xdest" target="_blank" class="hover:text-gray-300 transition">GitHub</a>
+        </div>
+    </div>
+</footer>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -120,8 +134,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             listEl.innerHTML = `
                 <div class="p-12 text-center text-gray-500">
                     <div class="text-5xl mb-4">🤷</div>
-                    <p class="text-lg">Noch keine hilfreichen Antworten</p>
-                    <p class="text-sm mt-2">Sei der Erste der anderen hilft!</p>
+                    <p class="text-lg">No helpful answers yet</p>
+                    <p class="text-sm mt-2">Be the first to help others!</p>
                 </div>
             `;
             podiumEl.innerHTML = '';
@@ -149,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                          alt="${user.username}">
                     <span class="font-semibold group-hover:text-purple-400 transition">${user.username}</span>
                     <span class="text-2xl">${label}</span>
-                    <span class="text-sm text-gray-400">${user.total_score} Punkte</span>
+                    <span class="text-sm text-gray-400">${user.total_score} Points</span>
                     <div class="${height} w-20 bg-gradient-to-t ${color} rounded-t-lg mt-2 flex items-center justify-center">
                         <span class="text-white font-bold text-2xl">${idx + 1}</span>
                     </div>
@@ -169,14 +183,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <div class="flex-1">
                     <p class="font-semibold">${user.username}</p>
                     <p class="text-sm text-gray-500">
-                        ${user.solutions_count > 0 ? `✅ ${user.solutions_count} Lösungen · ` : ''}${user.response_helpful > 0 ? `👍 ${user.response_helpful} Response-Votes · ` : ''}${user.github_reactions > 0 ? `🐙 ${user.github_reactions} GitHub👍 · ` : ''}${user.github_negative_reactions > 0 ? `👎 ${user.github_negative_reactions} GitHub👎 · ` : ''}${user.issue_helpful > 0 ? `📝 ${user.issue_helpful} Issue-Votes` : ''}${user.five_star_ratings > 0 ? ` · ⭐ ${user.five_star_ratings}x 5★` : ''}
+                        ${user.solutions_count > 0 ? `✅ ${user.solutions_count} Solutions · ` : ''}${user.response_helpful > 0 ? `👍 ${user.response_helpful} Response votes · ` : ''}${user.github_reactions > 0 ? `🐙 ${user.github_reactions} GitHub👍 · ` : ''}${user.github_negative_reactions > 0 ? `👎 ${user.github_negative_reactions} GitHub👎 · ` : ''}${user.issue_helpful > 0 ? `📝 ${user.issue_helpful} Issue votes` : ''}${user.five_star_ratings > 0 ? ` · ⭐ ${user.five_star_ratings}x 5★` : ''}
                     </p>
                 </div>
                 <div class="text-right">
                     <p class="font-bold text-lg bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
                         ${user.total_score}
                     </p>
-                    <p class="text-xs text-gray-500">Punkte</p>
+                    <p class="text-xs text-gray-500">Points</p>
                 </div>
             </a>
         `).join('');
@@ -185,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.error('Error loading leaderboard:', error);
         document.getElementById('leaderboard-list').innerHTML = `
             <div class="p-8 text-center text-red-400">
-                Fehler beim Laden des Leaderboards
+                Error loading leaderboard
             </div>
         `;
     }

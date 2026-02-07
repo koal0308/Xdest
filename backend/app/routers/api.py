@@ -17,14 +17,34 @@ router = APIRouter(prefix="/api", tags=["api"])
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
 
-# GitHub Issue Type Labels Mapping
+# GitHub Issue Type Labels Mapping with colors
 GITHUB_LABELS = {
-    "bug": ["bug"],
-    "feature": ["enhancement"],
-    "question": ["question"],
-    "security": ["security"],
-    "docs": ["documentation"]
+    "bug": {"name": "bug", "color": "d73a4a", "description": "Something isn't working"},
+    "feature": {"name": "enhancement", "color": "a2eeef", "description": "New feature or request"},
+    "question": {"name": "question", "color": "d876e3", "description": "Further information is requested"},
+    "security": {"name": "security", "color": "ff9800", "description": "Security related issue"},
+    "docs": {"name": "documentation", "color": "0075ca", "description": "Improvements or additions to documentation"}
 }
+
+async def ensure_label_exists(
+    github_token: str,
+    repo_owner: str,
+    repo_name: str,
+    label_info: dict
+) -> bool:
+    """Erstellt ein Label im Repository falls es nicht existiert"""
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/labels"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        # Versuche Label zu erstellen
+        response = await client.post(url, headers=headers, json=label_info)
+        # 201 = erstellt, 422 = existiert bereits (beides okay)
+        return response.status_code in [201, 422]
 
 async def create_github_issue(
     github_token: str,
@@ -93,6 +113,9 @@ async def create_project(
     project_url: str = Form(""),
     github_url: str = Form(""),
     tags: str = Form(""),
+    google_analytics_id: str = Form(""),
+    plausible_domain: str = Form(""),
+    plausible_api_key: str = Form(""),
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -117,6 +140,9 @@ async def create_project(
         project_url=project_url if project_url else None,
         github_url=github_url if github_url else None,
         tags=tags if tags else None,
+        google_analytics_id=google_analytics_id if google_analytics_id else None,
+        plausible_domain=plausible_domain if plausible_domain else None,
+        plausible_api_key=plausible_api_key if plausible_api_key else None,
         image=image_url
     )
     db.add(project)
@@ -134,6 +160,9 @@ async def edit_project(
     project_url: str = Form(""),
     github_url: str = Form(""),
     tags: str = Form(""),
+    google_analytics_id: str = Form(""),
+    plausible_domain: str = Form(""),
+    plausible_api_key: str = Form(""),
     image: UploadFile = File(None),
     remove_image: str = Form(""),
     db: Session = Depends(get_db)
@@ -155,6 +184,11 @@ async def edit_project(
     project.project_url = project_url if project_url else None
     project.github_url = github_url if github_url else None
     project.tags = tags if tags else None
+    project.google_analytics_id = google_analytics_id if google_analytics_id else None
+    project.plausible_domain = plausible_domain if plausible_domain else None
+    # Only update API key if provided (don't overwrite with empty)
+    if plausible_api_key:
+        project.plausible_api_key = plausible_api_key
     
     # Handle image
     if remove_image == "1":
@@ -353,6 +387,94 @@ async def connect_github_repo(
     db.commit()
     
     return RedirectResponse(url=f"/project/{project_id}", status_code=302)
+
+# ===== Plausible Analytics API =====
+@router.get("/project/{project_id}/analytics")
+async def get_project_analytics(project_id: int, request: Request, db: Session = Depends(get_db)):
+    """Holt Plausible Analytics Daten für ein Projekt"""
+    import httpx
+    
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if not project.plausible_domain or not project.plausible_api_key:
+        return {"error": "no_analytics", "message": "Plausible not configured"}
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {project.plausible_api_key}"}
+            base_url = "https://plausible.io/api/v1/stats"
+            
+            # Realtime visitors
+            realtime_resp = await client.get(
+                f"{base_url}/realtime/visitors",
+                params={"site_id": project.plausible_domain},
+                headers=headers
+            )
+            realtime = realtime_resp.json() if realtime_resp.status_code == 200 else 0
+            
+            # Aggregate stats (last 30 days)
+            aggregate_resp = await client.get(
+                f"{base_url}/aggregate",
+                params={
+                    "site_id": project.plausible_domain,
+                    "period": "30d",
+                    "metrics": "visitors,pageviews,bounce_rate,visit_duration"
+                },
+                headers=headers
+            )
+            aggregate = aggregate_resp.json().get("results", {}) if aggregate_resp.status_code == 200 else {}
+            
+            # Time series (last 7 days)
+            timeseries_resp = await client.get(
+                f"{base_url}/timeseries",
+                params={
+                    "site_id": project.plausible_domain,
+                    "period": "7d",
+                    "metrics": "visitors,pageviews"
+                },
+                headers=headers
+            )
+            timeseries = timeseries_resp.json().get("results", []) if timeseries_resp.status_code == 200 else []
+            
+            # Top pages
+            pages_resp = await client.get(
+                f"{base_url}/breakdown",
+                params={
+                    "site_id": project.plausible_domain,
+                    "period": "30d",
+                    "property": "event:page",
+                    "limit": "5"
+                },
+                headers=headers
+            )
+            pages = pages_resp.json().get("results", []) if pages_resp.status_code == 200 else []
+            
+            # Top sources
+            sources_resp = await client.get(
+                f"{base_url}/breakdown",
+                params={
+                    "site_id": project.plausible_domain,
+                    "period": "30d",
+                    "property": "visit:source",
+                    "limit": "5"
+                },
+                headers=headers
+            )
+            sources = sources_resp.json().get("results", []) if sources_resp.status_code == 200 else []
+            
+            return {
+                "realtime_visitors": realtime,
+                "aggregate": aggregate,
+                "timeseries": timeseries,
+                "top_pages": pages,
+                "top_sources": sources,
+                "domain": project.plausible_domain
+            }
+            
+    except Exception as e:
+        return {"error": "api_error", "message": str(e)}
 
 @router.get("/github/repo-info")
 async def get_github_repo_info(repo_url: str, request: Request, db: Session = Depends(get_db)):
@@ -560,7 +682,7 @@ async def get_github_repo_activity(
         issues_resp = await client.get(
             f"https://api.github.com/repos/{owner}/{repo}/issues",
             headers=headers,
-            params={"per_page": 10, "state": "all", "sort": "updated"}
+            params={"per_page": 30, "state": "all", "sort": "updated"}
         )
         issues = issues_resp.json() if issues_resp.status_code == 200 else []
         
@@ -568,7 +690,7 @@ async def get_github_repo_activity(
         prs_resp = await client.get(
             f"https://api.github.com/repos/{owner}/{repo}/pulls",
             headers=headers,
-            params={"per_page": 10, "state": "all", "sort": "updated"}
+            params={"per_page": 30, "state": "all", "sort": "updated"}
         )
         prs = prs_resp.json() if prs_resp.status_code == 200 else []
         
@@ -630,7 +752,7 @@ async def get_github_repo_activity(
                 "comments": i["comments"],
                 "url": i["html_url"],
                 "is_pr": "pull_request" in i
-            } for i in issues if "pull_request" not in i][:10],
+            } for i in issues if "pull_request" not in i][:20],
             "pull_requests": [{
                 "number": pr["number"],
                 "title": pr["title"],
@@ -641,7 +763,7 @@ async def get_github_repo_activity(
                 "updated_at": pr["updated_at"],
                 "url": pr["html_url"],
                 "merged": pr.get("merged_at") is not None
-            } for pr in prs][:10],
+            } for pr in prs][:20],
             "recent_comments": [{
                 "id": c["id"],
                 "body": c["body"][:200] + "..." if len(c.get("body", "")) > 200 else c.get("body", ""),
@@ -706,8 +828,18 @@ async def create_issue(
                 full_screenshot_url = f"{settings.APP_URL}{screenshot_url}"
                 github_body += f"\n### Screenshot\n![Screenshot]({full_screenshot_url})\n"
             
-            # Labels für Issue Type
-            labels = GITHUB_LABELS.get(issue_type, [])
+            # Labels für Issue Type - zuerst Label erstellen falls nicht vorhanden
+            label_info = GITHUB_LABELS.get(issue_type)
+            labels = []
+            if label_info:
+                # Erstelle Label falls es nicht existiert
+                await ensure_label_exists(
+                    github_token=user.github_token,
+                    repo_owner=repo_owner,
+                    repo_name=repo_name,
+                    label_info=label_info
+                )
+                labels = [label_info["name"]]
             
             # GitHub Issue erstellen
             github_result = await create_github_issue(
@@ -1607,7 +1739,12 @@ async def download_my_data(request: Request, db: Session = Depends(get_db)):
 
 @router.delete("/privacy/delete-account")
 async def delete_account(request: Request, db: Session = Depends(get_db)):
-    """Delete user account and all associated data (GDPR Right to Erasure)"""
+    """Delete user account and all associated data (GDPR Right to Erasure)
+    
+    WICHTIG: Punkte anderer User bleiben erhalten!
+    - Antworten ANDERER User auf Issues des gelöschten Users bleiben erhalten
+    - Nur eigene Antworten und eigene Issues werden entfernt
+    """
     user = await get_current_user(request, db)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -1617,32 +1754,64 @@ async def delete_account(request: Request, db: Session = Depends(get_db)):
     try:
         # Delete in order of dependencies
         
-        # 1. Delete votes
+        # 1. Delete votes BY this user
         db.query(ResponseVote).filter(ResponseVote.user_id == user.id).delete()
         db.query(IssueVote).filter(IssueVote.user_id == user.id).delete()
         
-        # 2. Delete ratings
+        # 2. Delete ratings BY this user
         db.query(ProjectRating).filter(ProjectRating.user_id == user.id).delete()
         db.query(UserRating).filter(UserRating.rater_user_id == user.id).delete()
+        # Ratings FOR this user werden auch gelöscht
         db.query(UserRating).filter(UserRating.rated_user_id == user.id).delete()
         
-        # 3. Delete responses (including solution markers)
+        # 3. Delete responses BY this user (seine eigenen Antworten)
+        # ABER: Die Punkte (helpful_count, is_solution) gehen mit dem User verloren - das ist OK
         db.query(IssueResponse).filter(IssueResponse.user_id == user.id).delete()
         
-        # 4. Delete issues created by user
-        db.query(Issue).filter(Issue.user_id == user.id).delete()
+        # 4. Issues BY this user - NUR löschen wenn keine Antworten von anderen existieren
+        user_issues = db.query(Issue).filter(Issue.user_id == user.id).all()
+        for issue in user_issues:
+            # Prüfe ob andere User geantwortet haben
+            other_responses = db.query(IssueResponse).filter(
+                IssueResponse.issue_id == issue.id,
+                IssueResponse.user_id != user.id
+            ).count()
+            
+            if other_responses == 0:
+                # Keine Antworten von anderen - kann sicher gelöscht werden
+                db.query(IssueVote).filter(IssueVote.issue_id == issue.id).delete()
+                db.delete(issue)
+            # else: Issue bleibt bestehen damit die Punkte der Responder erhalten bleiben
+            # Die Antworten anderer User behalten ihre is_solution und helpful_count
         
-        # 5. Delete projects (and their associated issues/responses will cascade)
+        # 5. Delete projects
         user_projects = db.query(Project).filter(Project.user_id == user.id).all()
         for project in user_projects:
-            # Delete all issues and responses for this project
+            # Issues vom Projekt - wieder nur löschen wenn keine Antworten anderer
             project_issues = db.query(Issue).filter(Issue.project_id == project.id).all()
             for issue in project_issues:
-                db.query(IssueResponse).filter(IssueResponse.issue_id == issue.id).delete()
-                db.query(IssueVote).filter(IssueVote.issue_id == issue.id).delete()
-            db.query(Issue).filter(Issue.project_id == project.id).delete()
+                other_responses = db.query(IssueResponse).filter(
+                    IssueResponse.issue_id == issue.id
+                ).count()
+                
+                if other_responses == 0:
+                    db.query(IssueVote).filter(IssueVote.issue_id == issue.id).delete()
+                    db.delete(issue)
+                else:
+                    # Issue hat Antworten - entkopple es vom Projekt aber lösche es nicht
+                    # Setze project_id auf ein "orphan" Projekt oder NULL (wenn erlaubt)
+                    # Da project_id nullable=False ist, müssen wir das Issue behalten
+                    pass  # Issue bleibt bestehen
+            
+            # Nur Issues ohne Antworten wurden gelöscht, der Rest bleibt
+            # Projekt-Ratings löschen
             db.query(ProjectRating).filter(ProjectRating.project_id == project.id).delete()
-        db.query(Project).filter(Project.user_id == user.id).delete()
+            
+            # Prüfe ob noch Issues am Projekt hängen
+            remaining_issues = db.query(Issue).filter(Issue.project_id == project.id).count()
+            if remaining_issues == 0:
+                db.delete(project)
+            # else: Projekt bleibt wegen der Issues mit Antworten
         
         # 6. Delete comments and posts
         db.query(Comment).filter(Comment.user_id == user.id).delete()

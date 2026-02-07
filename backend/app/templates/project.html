@@ -2,6 +2,19 @@
 
 {% block title %}{{ project.name }} - Xdest{% endblock %}
 
+{% block extra_head %}
+{% if project.google_analytics_id %}
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ project.google_analytics_id }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ project.google_analytics_id }}');
+</script>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen">
     <!-- Navigation -->
@@ -108,6 +121,162 @@
                     </span>
                     {% endif %}
                 </div>
+
+                <!-- Analytics Dashboard (nur für Owner wenn konfiguriert) -->
+                {% if is_owner and project.plausible_domain and project.plausible_api_key %}
+                <div id="analytics-dashboard" class="mb-4 p-4 bg-dark-200 rounded-lg border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Analytics Dashboard
+                        </h3>
+                        <button onclick="refreshAnalytics()" class="text-sm text-gray-400 hover:text-white transition flex items-center gap-1">
+                            <svg id="refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Aktualisieren
+                        </button>
+                    </div>
+                    
+                    <div id="analytics-loading" class="text-center py-6">
+                        <div class="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto"></div>
+                        <p class="text-gray-400 mt-2">Analytics werden geladen...</p>
+                    </div>
+                    
+                    <div id="analytics-error" class="hidden text-center py-6 text-red-400">
+                        <svg class="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <p id="analytics-error-msg">Fehler beim Laden der Analytics</p>
+                    </div>
+                    
+                    <div id="analytics-content" class="hidden">
+                        <!-- Realtime & Aggregate Stats -->
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                            <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
+                                <div id="stat-realtime" class="text-2xl font-bold text-green-400">-</div>
+                                <div class="text-xs text-gray-400">Jetzt online</div>
+                            </div>
+                            <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
+                                <div id="stat-visitors" class="text-2xl font-bold text-blue-400">-</div>
+                                <div class="text-xs text-gray-400">Besucher (30d)</div>
+                            </div>
+                            <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
+                                <div id="stat-pageviews" class="text-2xl font-bold text-purple-400">-</div>
+                                <div class="text-xs text-gray-400">Seitenaufrufe</div>
+                            </div>
+                            <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
+                                <div id="stat-bounce" class="text-2xl font-bold text-yellow-400">-</div>
+                                <div class="text-xs text-gray-400">Bounce Rate</div>
+                            </div>
+                            <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
+                                <div id="stat-duration" class="text-2xl font-bold text-pink-400">-</div>
+                                <div class="text-xs text-gray-400">Verweildauer</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chart -->
+                        <div class="mb-4 p-4 bg-dark-300 rounded-lg border border-gray-600">
+                            <h4 class="text-sm font-semibold text-gray-400 mb-3">Besucher der letzten 7 Tage</h4>
+                            <div id="visitors-chart" class="h-32 flex items-end justify-between gap-1">
+                                <!-- Wird per JS gefüllt -->
+                            </div>
+                        </div>
+                        
+                        <!-- Top Pages & Sources -->
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="p-4 bg-dark-300 rounded-lg border border-gray-600">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Top Seiten</h4>
+                                <ul id="top-pages" class="space-y-2 text-sm">
+                                    <!-- Wird per JS gefüllt -->
+                                </ul>
+                            </div>
+                            <div class="p-4 bg-dark-300 rounded-lg border border-gray-600">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Traffic Quellen</h4>
+                                <ul id="top-sources" class="space-y-2 text-sm">
+                                    <!-- Wird per JS gefüllt -->
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xs text-gray-500 mt-3 text-center">
+                            Powered by <a href="https://plausible.io" target="_blank" class="text-green-400 hover:underline">Plausible Analytics</a> · 
+                            Domain: <span id="analytics-domain">-</span>
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Google Analytics Dashboard (nur für Owner wenn konfiguriert) -->
+                {% if is_owner and project.google_analytics_id %}
+                <div id="ga-dashboard" class="mb-4 p-4 bg-dark-200 rounded-lg border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5 text-orange-400" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M22.84 2.998c-.648-.162-1.296.162-1.62.648l-6.48 9.72-4.212-4.212c-.486-.486-1.296-.486-1.782 0l-6.48 6.48c-.486.486-.486 1.296 0 1.782.243.243.567.365.891.365s.648-.122.891-.365l5.589-5.589 4.212 4.212c.243.243.567.365.891.365.162 0 .324-.041.486-.081.486-.162.81-.567.972-1.053l6.804-10.206c.324-.486.243-1.134-.162-1.458-.162-.162-.486-.324-.81-.324-.162 0-.324.041-.486.081l-.001-.001zM2 20h20v2H2z"/>
+                            </svg>
+                            Google Analytics
+                            <span class="text-xs text-gray-500 font-normal">({{ project.google_analytics_id }})</span>
+                        </h3>
+                        <a href="https://analytics.google.com/analytics/web/#/report-home/{{ project.google_analytics_id }}" 
+                           target="_blank" 
+                           class="text-sm text-orange-400 hover:text-orange-300 transition flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Vollständiges Dashboard
+                        </a>
+                    </div>
+                    
+                    <div class="bg-dark-300 rounded-lg border border-gray-600 p-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-400" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M22.84 2.998c-.648-.162-1.296.162-1.62.648l-6.48 9.72-4.212-4.212c-.486-.486-1.296-.486-1.782 0l-6.48 6.48c-.486.486-.486 1.296 0 1.782.243.243.567.365.891.365s.648-.122.891-.365l5.589-5.589 4.212 4.212c.243.243.567.365.891.365.162 0 .324-.041.486-.081.486-.162.81-.567.972-1.053l6.804-10.206c.324-.486.243-1.134-.162-1.458-.162-.162-.486-.324-.81-.324-.162 0-.324.041-.486.081l-.001-.001zM2 20h20v2H2z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">Tracking aktiv für</p>
+                                <p class="font-semibold text-white">{{ project.project_url or project.name }}</p>
+                            </div>
+                        </div>
+                        
+                        <p class="text-sm text-gray-400 mb-3">
+                            Google Analytics trackt alle Besucher dieser Projektseite. Die detaillierten Statistiken 
+                            findest du in deinem Google Analytics Dashboard.
+                        </p>
+                        
+                        <div class="flex flex-wrap gap-2">
+                            <a href="https://analytics.google.com/analytics/web/#/realtime/rt-overview/{{ project.google_analytics_id }}" 
+                               target="_blank"
+                               class="px-3 py-1.5 bg-orange-500/20 text-orange-400 text-sm rounded-lg hover:bg-orange-500/30 transition">
+                                🔴 Echtzeit
+                            </a>
+                            <a href="https://analytics.google.com/analytics/web/#/report/visitors-overview/{{ project.google_analytics_id }}" 
+                               target="_blank"
+                               class="px-3 py-1.5 bg-blue-500/20 text-blue-400 text-sm rounded-lg hover:bg-blue-500/30 transition">
+                                👥 Zielgruppe
+                            </a>
+                            <a href="https://analytics.google.com/analytics/web/#/report/trafficsources-overview/{{ project.google_analytics_id }}" 
+                               target="_blank"
+                               class="px-3 py-1.5 bg-green-500/20 text-green-400 text-sm rounded-lg hover:bg-green-500/30 transition">
+                                📊 Akquisition
+                            </a>
+                            <a href="https://analytics.google.com/analytics/web/#/report/content-overview/{{ project.google_analytics_id }}" 
+                               target="_blank"
+                               class="px-3 py-1.5 bg-purple-500/20 text-purple-400 text-sm rounded-lg hover:bg-purple-500/30 transition">
+                                📄 Verhalten
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xs text-gray-500 mt-3 text-center">
+                        Powered by <a href="https://analytics.google.com" target="_blank" class="text-orange-400 hover:underline">Google Analytics</a>
+                    </p>
+                </div>
+                {% endif %}
 
                 <!-- Project Links -->
                 <div class="flex flex-wrap gap-3">
@@ -327,6 +496,20 @@
         </div>
     </main>
 </div>
+
+<!-- Footer -->
+<footer class="border-t border-gray-800 bg-gray-950 py-4 px-6 mt-8">
+    <div class="max-w-7xl mx-auto flex justify-between items-center text-xs text-gray-500">
+        <span>© 2026 Xdest</span>
+        <div class="flex gap-4">
+            <a href="mailto:aiandfriends@gmail.com" class="hover:text-gray-300 transition">Contact</a>
+            <a href="https://x.com/karlbeis" target="_blank" class="hover:text-gray-300 transition">𝕏 @karlbeis</a>
+            <a href="/privacy" class="hover:text-gray-300 transition">Privacy</a>
+            <a href="/terms" class="hover:text-gray-300 transition">Terms</a>
+            <a href="https://github.com/koal0308/Xdest" target="_blank" class="hover:text-gray-300 transition">GitHub</a>
+        </div>
+    </div>
+</footer>
 
 <!-- GitHub Repo Connection Modal -->
 {% if is_owner and not project.github_url %}
@@ -775,6 +958,13 @@ function renderActivity(el, data) {
     const prs = data.pull_requests || [];
     const comments = data.recent_comments || [];
     
+    // Zähle offene/geschlossene
+    const openIssues = issues.filter(i => i.state === 'open').length;
+    const closedIssues = issues.filter(i => i.state === 'closed').length;
+    const openPRs = prs.filter(p => p.state === 'open').length;
+    const closedPRs = prs.filter(p => p.state === 'closed').length;
+    const mergedPRs = prs.filter(p => p.merged).length;
+    
     el.innerHTML = `
         <div class="grid md:grid-cols-2 gap-6">
             <!-- Recent Activity -->
@@ -800,46 +990,58 @@ function renderActivity(el, data) {
                 </div>
             </div>
             
-            <!-- Issues & PRs -->
+            <!-- Pull Requests -->
             <div>
                 <h3 class="font-semibold mb-3 flex items-center gap-2">
-                    <span>🐛</span> Issues & Pull Requests
+                    <span>�</span> Pull Requests
+                    <span class="text-xs text-gray-500 ml-auto">${openPRs} open · ${mergedPRs} merged · ${closedPRs - mergedPRs} closed</span>
                 </h3>
-                <div class="space-y-2 max-h-80 overflow-y-auto">
-                    ${prs.map(pr => `
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                    ${prs.length > 0 ? prs.map(pr => `
                         <a href="${pr.url}" target="_blank" class="block p-3 bg-dark-300 rounded-lg hover:bg-dark-200 transition">
                             <div class="flex items-center gap-2">
                                 <span class="${pr.merged ? 'text-purple-400' : pr.state === 'open' ? 'text-green-400' : 'text-red-400'}">
                                     ${pr.merged ? '🔀' : pr.state === 'open' ? '🟢' : '🔴'}
                                 </span>
                                 <span class="text-sm truncate flex-1">${pr.title}</span>
-                                <span class="text-xs text-gray-500">#${pr.number}</span>
+                                <span class="text-xs px-2 py-0.5 rounded ${pr.merged ? 'bg-purple-600/20 text-purple-400' : pr.state === 'open' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}">${pr.merged ? 'merged' : pr.state}</span>
                             </div>
                             <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
                                 ${pr.user_avatar ? `<img src="${pr.user_avatar}" class="w-4 h-4 rounded-full" alt="">` : ''}
                                 <span>${pr.user}</span>
-                                <span>${formatDate(pr.updated_at)}</span>
+                                <span>#${pr.number}</span>
+                                <span class="ml-auto">${formatDate(pr.updated_at)}</span>
                             </div>
                         </a>
-                    `).join('')}
-                    ${issues.map(issue => `
-                        <a href="${issue.url}" target="_blank" class="block p-3 bg-dark-300 rounded-lg hover:bg-dark-200 transition">
-                            <div class="flex items-center gap-2">
-                                <span class="${issue.state === 'open' ? 'text-green-400' : 'text-red-400'}">
-                                    ${issue.state === 'open' ? '🟢' : '🔴'}
-                                </span>
-                                <span class="text-sm truncate flex-1">${issue.title}</span>
-                                <span class="text-xs text-gray-500">#${issue.number}</span>
-                            </div>
-                            <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                                ${issue.user_avatar ? `<img src="${issue.user_avatar}" class="w-4 h-4 rounded-full" alt="">` : ''}
-                                <span>${issue.user}</span>
-                                <span>💬 ${issue.comments}</span>
-                            </div>
-                        </a>
-                    `).join('')}
-                    ${prs.length === 0 && issues.length === 0 ? '<p class="text-gray-400 text-sm p-3">No issues or pull requests</p>' : ''}
+                    `).join('') : '<p class="text-gray-400 text-sm p-3">No pull requests</p>'}
                 </div>
+            </div>
+        </div>
+        
+        <!-- Issues -->
+        <div class="mt-6">
+            <h3 class="font-semibold mb-3 flex items-center gap-2">
+                <span>🐛</span> Issues
+                <span class="text-xs text-gray-500 ml-auto">${openIssues} open · ${closedIssues} closed</span>
+            </h3>
+            <div class="grid md:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                ${issues.length > 0 ? issues.map(issue => `
+                    <a href="${issue.url}" target="_blank" class="block p-3 bg-dark-300 rounded-lg hover:bg-dark-200 transition">
+                        <div class="flex items-center gap-2">
+                            <span class="${issue.state === 'open' ? 'text-green-400' : 'text-purple-400'}">
+                                ${issue.state === 'open' ? '🟢' : '✅'}
+                            </span>
+                            <span class="text-sm truncate flex-1">${issue.title}</span>
+                            <span class="text-xs px-2 py-0.5 rounded ${issue.state === 'open' ? 'bg-green-600/20 text-green-400' : 'bg-purple-600/20 text-purple-400'}">${issue.state}</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            ${issue.user_avatar ? `<img src="${issue.user_avatar}" class="w-4 h-4 rounded-full" alt="">` : ''}
+                            <span>${issue.user}</span>
+                            <span>#${issue.number}</span>
+                            <span>💬 ${issue.comments}</span>
+                        </div>
+                    </a>
+                `).join('') : '<p class="text-gray-400 text-sm p-3 col-span-2">No issues</p>'}
             </div>
         </div>
         
@@ -977,5 +1179,164 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     loadProjectRating();
 });
+</script>
+
+<!-- Analytics Dashboard Script -->
+<script>
+const analyticsProjectId = {{ project.id }};
+
+async function loadAnalytics() {
+    const loading = document.getElementById('analytics-loading');
+    const error = document.getElementById('analytics-error');
+    const content = document.getElementById('analytics-content');
+    
+    if (!loading) return; // Dashboard nicht vorhanden
+    
+    loading.classList.remove('hidden');
+    error.classList.add('hidden');
+    content.classList.add('hidden');
+    
+    try {
+        const resp = await fetch(`/api/project/${analyticsProjectId}/analytics`);
+        const data = await resp.json();
+        
+        if (data.error) {
+            throw new Error(data.message || 'Analytics nicht konfiguriert');
+        }
+        
+        // Realtime
+        document.getElementById('stat-realtime').textContent = data.realtime_visitors || '0';
+        
+        // Aggregate Stats
+        const agg = data.aggregate || {};
+        document.getElementById('stat-visitors').textContent = formatNumber(agg.visitors?.value) || '-';
+        document.getElementById('stat-pageviews').textContent = formatNumber(agg.pageviews?.value) || '-';
+        document.getElementById('stat-bounce').textContent = agg.bounce_rate?.value ? `${Math.round(agg.bounce_rate.value)}%` : '-';
+        document.getElementById('stat-duration').textContent = agg.visit_duration?.value ? formatDuration(agg.visit_duration.value) : '-';
+        
+        // Chart
+        renderVisitorsChart(data.timeseries || []);
+        
+        // Top Pages
+        renderTopPages(data.top_pages || []);
+        
+        // Top Sources
+        renderTopSources(data.top_sources || []);
+        
+        // Domain
+        document.getElementById('analytics-domain').textContent = data.domain || '-';
+        
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        
+    } catch (e) {
+        console.error('Analytics error:', e);
+        loading.classList.add('hidden');
+        document.getElementById('analytics-error-msg').textContent = e.message;
+        error.classList.remove('hidden');
+    }
+}
+
+function formatNumber(num) {
+    if (!num && num !== 0) return '-';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '-';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
+function renderVisitorsChart(timeseries) {
+    const chart = document.getElementById('visitors-chart');
+    if (!chart || timeseries.length === 0) {
+        if (chart) chart.innerHTML = '<p class="text-gray-500 text-sm">Keine Daten verfügbar</p>';
+        return;
+    }
+    
+    const maxVisitors = Math.max(...timeseries.map(d => d.visitors || 0)) || 1;
+    
+    chart.innerHTML = timeseries.map(day => {
+        const height = ((day.visitors || 0) / maxVisitors) * 100;
+        const date = new Date(day.date);
+        const dayName = date.toLocaleDateString('de-DE', { weekday: 'short' });
+        return `
+            <div class="flex-1 flex flex-col items-center">
+                <div class="w-full bg-green-500/20 rounded-t relative" style="height: ${Math.max(height, 5)}%">
+                    <div class="absolute inset-0 bg-green-500 rounded-t opacity-60"></div>
+                </div>
+                <span class="text-xs text-gray-500 mt-1">${dayName}</span>
+                <span class="text-xs text-green-400">${day.visitors || 0}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTopPages(pages) {
+    const list = document.getElementById('top-pages');
+    if (!list) return;
+    
+    if (pages.length === 0) {
+        list.innerHTML = '<li class="text-gray-500">Keine Daten</li>';
+        return;
+    }
+    
+    const maxViews = Math.max(...pages.map(p => p.visitors || 0)) || 1;
+    
+    list.innerHTML = pages.map(page => {
+        const percent = ((page.visitors || 0) / maxViews) * 100;
+        return `
+            <li class="relative">
+                <div class="absolute inset-0 bg-purple-500/10 rounded" style="width: ${percent}%"></div>
+                <div class="relative flex justify-between items-center p-2">
+                    <span class="text-gray-300 truncate flex-1">${page.page || '/'}</span>
+                    <span class="text-purple-400 ml-2">${page.visitors || 0}</span>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
+function renderTopSources(sources) {
+    const list = document.getElementById('top-sources');
+    if (!list) return;
+    
+    if (sources.length === 0) {
+        list.innerHTML = '<li class="text-gray-500">Keine Daten</li>';
+        return;
+    }
+    
+    const maxVisitors = Math.max(...sources.map(s => s.visitors || 0)) || 1;
+    
+    list.innerHTML = sources.map(source => {
+        const percent = ((source.visitors || 0) / maxVisitors) * 100;
+        const sourceName = source.source || 'Direct / None';
+        return `
+            <li class="relative">
+                <div class="absolute inset-0 bg-blue-500/10 rounded" style="width: ${percent}%"></div>
+                <div class="relative flex justify-between items-center p-2">
+                    <span class="text-gray-300 truncate flex-1">${sourceName}</span>
+                    <span class="text-blue-400 ml-2">${source.visitors || 0}</span>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
+function refreshAnalytics() {
+    const icon = document.getElementById('refresh-icon');
+    if (icon) icon.classList.add('animate-spin');
+    
+    loadAnalytics().finally(() => {
+        if (icon) icon.classList.remove('animate-spin');
+    });
+}
+
+// Load analytics on page load
+document.addEventListener('DOMContentLoaded', loadAnalytics);
 </script>
 {% endblock %}
