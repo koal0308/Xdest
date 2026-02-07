@@ -296,3 +296,21 @@ async def issue_detail_page(project_id: int, issue_id: int, request: Request, db
         "is_owner": is_owner,
         "is_reporter": is_reporter
     })
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request, db: Session = Depends(get_db)):
+    user = await get_current_user_optional(request, db)
+    return templates.TemplateResponse("privacy.html", {
+        "request": request,
+        "user": user
+    })
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request, db: Session = Depends(get_db)):
+    user = await get_current_user_optional(request, db)
+    return templates.TemplateResponse("terms.html", {
+        "request": request,
+        "user": user
+    })

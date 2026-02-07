@@ -1430,3 +1430,233 @@ async def get_user_rating(
     })
 
 
+# ============================================
+# Privacy & GDPR Endpoints
+# ============================================
+
+@router.get("/privacy/data-summary")
+async def get_data_summary(request: Request, db: Session = Depends(get_db)):
+    """Get a summary of user's data for the privacy page"""
+    user = await get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    from app.models import IssueVote, ProjectRating, UserRating
+    
+    projects_count = db.query(func.count(Project.id)).filter(Project.user_id == user.id).scalar() or 0
+    issues_count = db.query(func.count(Issue.id)).filter(Issue.user_id == user.id).scalar() or 0
+    responses_count = db.query(func.count(IssueResponse.id)).filter(IssueResponse.user_id == user.id).scalar() or 0
+    
+    # Count all votes (response votes + issue votes)
+    response_votes = db.query(func.count(ResponseVote.id)).filter(ResponseVote.user_id == user.id).scalar() or 0
+    issue_votes = db.query(func.count(IssueVote.id)).filter(IssueVote.user_id == user.id).scalar() or 0
+    
+    return JSONResponse({
+        "projects": projects_count,
+        "issues": issues_count,
+        "responses": responses_count,
+        "votes": response_votes + issue_votes
+    })
+
+@router.get("/privacy/my-data")
+async def get_my_data(request: Request, db: Session = Depends(get_db)):
+    """Get all user's personal data (GDPR Right to Access)"""
+    user = await get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    from app.models import IssueVote, ProjectRating, UserRating
+    
+    # User profile
+    user_data = {
+        "profile": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "avatar": user.avatar,
+            "bio": user.bio,
+            "github": user.github,
+            "provider": user.provider,
+            "role": user.role,
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        },
+        "projects": [],
+        "issues_created": [],
+        "responses": [],
+        "votes": {
+            "issue_votes": [],
+            "response_votes": []
+        },
+        "ratings": {
+            "project_ratings_given": [],
+            "user_ratings_given": [],
+            "user_ratings_received": []
+        }
+    }
+    
+    # Projects
+    projects = db.query(Project).filter(Project.user_id == user.id).all()
+    for p in projects:
+        user_data["projects"].append({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "github_url": p.github_url,
+            "project_url": p.project_url,
+            "tags": p.tags,
+            "created_at": p.created_at.isoformat() if p.created_at else None
+        })
+    
+    # Issues created
+    issues = db.query(Issue).filter(Issue.user_id == user.id).all()
+    for i in issues:
+        user_data["issues_created"].append({
+            "id": i.id,
+            "project_id": i.project_id,
+            "title": i.title,
+            "description": i.description,
+            "type": i.type,
+            "status": i.status,
+            "created_at": i.created_at.isoformat() if i.created_at else None
+        })
+    
+    # Responses
+    responses = db.query(IssueResponse).filter(IssueResponse.user_id == user.id).all()
+    for r in responses:
+        user_data["responses"].append({
+            "id": r.id,
+            "issue_id": r.issue_id,
+            "content": r.content,
+            "is_solution": r.is_solution,
+            "helpful_count": r.helpful_count,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    
+    # Votes
+    issue_votes = db.query(IssueVote).filter(IssueVote.user_id == user.id).all()
+    for v in issue_votes:
+        user_data["votes"]["issue_votes"].append({
+            "issue_id": v.issue_id,
+            "created_at": v.created_at.isoformat() if v.created_at else None
+        })
+    
+    response_votes_data = db.query(ResponseVote).filter(ResponseVote.user_id == user.id).all()
+    for v in response_votes_data:
+        user_data["votes"]["response_votes"].append({
+            "response_id": v.response_id,
+            "created_at": v.created_at.isoformat() if v.created_at else None
+        })
+    
+    # Ratings
+    project_ratings = db.query(ProjectRating).filter(ProjectRating.user_id == user.id).all()
+    for r in project_ratings:
+        user_data["ratings"]["project_ratings_given"].append({
+            "project_id": r.project_id,
+            "stars": r.stars,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    
+    user_ratings_given = db.query(UserRating).filter(UserRating.rater_user_id == user.id).all()
+    for r in user_ratings_given:
+        user_data["ratings"]["user_ratings_given"].append({
+            "rated_user_id": r.rated_user_id,
+            "stars": r.stars,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    
+    user_ratings_received = db.query(UserRating).filter(UserRating.rated_user_id == user.id).all()
+    for r in user_ratings_received:
+        user_data["ratings"]["user_ratings_received"].append({
+            "rater_user_id": r.rater_user_id,
+            "stars": r.stars,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    
+    return JSONResponse(user_data)
+
+@router.get("/privacy/download-data")
+async def download_my_data(request: Request, db: Session = Depends(get_db)):
+    """Download all user's data as JSON file (GDPR Right to Portability)"""
+    from fastapi.responses import Response
+    import json
+    
+    user = await get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Get all data using the existing endpoint logic
+    data_response = await get_my_data(request, db)
+    data = json.loads(data_response.body)
+    
+    # Add export metadata
+    data["_export_info"] = {
+        "exported_at": datetime.utcnow().isoformat(),
+        "platform": "Xdest",
+        "format_version": "1.0"
+    }
+    
+    json_str = json.dumps(data, indent=2, ensure_ascii=False)
+    
+    return Response(
+        content=json_str,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename=xdest_data_{user.username}_{datetime.utcnow().strftime('%Y%m%d')}.json"
+        }
+    )
+
+@router.delete("/privacy/delete-account")
+async def delete_account(request: Request, db: Session = Depends(get_db)):
+    """Delete user account and all associated data (GDPR Right to Erasure)"""
+    user = await get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    from app.models import IssueVote, ProjectRating, UserRating
+    
+    try:
+        # Delete in order of dependencies
+        
+        # 1. Delete votes
+        db.query(ResponseVote).filter(ResponseVote.user_id == user.id).delete()
+        db.query(IssueVote).filter(IssueVote.user_id == user.id).delete()
+        
+        # 2. Delete ratings
+        db.query(ProjectRating).filter(ProjectRating.user_id == user.id).delete()
+        db.query(UserRating).filter(UserRating.rater_user_id == user.id).delete()
+        db.query(UserRating).filter(UserRating.rated_user_id == user.id).delete()
+        
+        # 3. Delete responses (including solution markers)
+        db.query(IssueResponse).filter(IssueResponse.user_id == user.id).delete()
+        
+        # 4. Delete issues created by user
+        db.query(Issue).filter(Issue.user_id == user.id).delete()
+        
+        # 5. Delete projects (and their associated issues/responses will cascade)
+        user_projects = db.query(Project).filter(Project.user_id == user.id).all()
+        for project in user_projects:
+            # Delete all issues and responses for this project
+            project_issues = db.query(Issue).filter(Issue.project_id == project.id).all()
+            for issue in project_issues:
+                db.query(IssueResponse).filter(IssueResponse.issue_id == issue.id).delete()
+                db.query(IssueVote).filter(IssueVote.issue_id == issue.id).delete()
+            db.query(Issue).filter(Issue.project_id == project.id).delete()
+            db.query(ProjectRating).filter(ProjectRating.project_id == project.id).delete()
+        db.query(Project).filter(Project.user_id == user.id).delete()
+        
+        # 6. Delete comments and posts
+        db.query(Comment).filter(Comment.user_id == user.id).delete()
+        db.query(Post).filter(Post.user_id == user.id).delete()
+        
+        # 7. Finally delete the user
+        db.delete(user)
+        db.commit()
+        
+        # Clear session
+        request.session.clear()
+        
+        return JSONResponse({"message": "Account and all data deleted successfully"})
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
