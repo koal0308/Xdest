@@ -411,7 +411,7 @@ async function loadGitHubReactions() {
                 if (statusBadge) {
                     const syncBadge = document.createElement('span');
                     syncBadge.className = 'px-3 py-1 bg-orange-600/20 text-orange-400 rounded-full text-sm ml-2 cursor-pointer';
-                    syncBadge.innerHTML = '⚠️ In GitHub geschlossen - Klicken zum Sync';
+                    syncBadge.innerHTML = '⚠️ Closed on GitHub - Click to sync';
                     syncBadge.onclick = async function() {
                         const resp = await fetch(`/api/project/{{ project.id }}/sync-github-issues`, { method: 'POST' });
                         if (resp.ok) {

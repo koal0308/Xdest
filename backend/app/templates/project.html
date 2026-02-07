@@ -142,14 +142,14 @@
                     
                     <div id="analytics-loading" class="text-center py-6">
                         <div class="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto"></div>
-                        <p class="text-gray-400 mt-2">Analytics werden geladen...</p>
+                        <p class="text-gray-400 mt-2">Loading analytics...</p>
                     </div>
                     
                     <div id="analytics-error" class="hidden text-center py-6 text-red-400">
                         <svg class="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                         </svg>
-                        <p id="analytics-error-msg">Fehler beim Laden der Analytics</p>
+                        <p id="analytics-error-msg">Error loading analytics</p>
                     </div>
                     
                     <div id="analytics-content" class="hidden">
@@ -157,15 +157,15 @@
                         <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                             <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
                                 <div id="stat-realtime" class="text-2xl font-bold text-green-400">-</div>
-                                <div class="text-xs text-gray-400">Jetzt online</div>
+                                <div class="text-xs text-gray-400">Online now</div>
                             </div>
                             <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
                                 <div id="stat-visitors" class="text-2xl font-bold text-blue-400">-</div>
-                                <div class="text-xs text-gray-400">Besucher (30d)</div>
+                                <div class="text-xs text-gray-400">Visitors (30d)</div>
                             </div>
                             <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
                                 <div id="stat-pageviews" class="text-2xl font-bold text-purple-400">-</div>
-                                <div class="text-xs text-gray-400">Seitenaufrufe</div>
+                                <div class="text-xs text-gray-400">Page Views</div>
                             </div>
                             <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
                                 <div id="stat-bounce" class="text-2xl font-bold text-yellow-400">-</div>
@@ -173,30 +173,30 @@
                             </div>
                             <div class="text-center p-3 bg-dark-300 rounded-lg border border-gray-600">
                                 <div id="stat-duration" class="text-2xl font-bold text-pink-400">-</div>
-                                <div class="text-xs text-gray-400">Verweildauer</div>
+                                <div class="text-xs text-gray-400">Avg. Duration</div>
                             </div>
                         </div>
                         
                         <!-- Chart -->
                         <div class="mb-4 p-4 bg-dark-300 rounded-lg border border-gray-600">
-                            <h4 class="text-sm font-semibold text-gray-400 mb-3">Besucher der letzten 7 Tage</h4>
+                            <h4 class="text-sm font-semibold text-gray-400 mb-3">Visitors (last 7 days)</h4>
                             <div id="visitors-chart" class="h-32 flex items-end justify-between gap-1">
-                                <!-- Wird per JS gefüllt -->
+                                <!-- Filled by JS -->
                             </div>
                         </div>
                         
                         <!-- Top Pages & Sources -->
                         <div class="grid md:grid-cols-2 gap-4">
                             <div class="p-4 bg-dark-300 rounded-lg border border-gray-600">
-                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Top Seiten</h4>
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Top Pages</h4>
                                 <ul id="top-pages" class="space-y-2 text-sm">
-                                    <!-- Wird per JS gefüllt -->
+                                    <!-- Filled by JS -->
                                 </ul>
                             </div>
                             <div class="p-4 bg-dark-300 rounded-lg border border-gray-600">
-                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Traffic Quellen</h4>
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">Traffic Sources</h4>
                                 <ul id="top-sources" class="space-y-2 text-sm">
-                                    <!-- Wird per JS gefüllt -->
+                                    <!-- Filled by JS -->
                                 </ul>
                             </div>
                         </div>
@@ -958,7 +958,7 @@ function renderActivity(el, data) {
     const prs = data.pull_requests || [];
     const comments = data.recent_comments || [];
     
-    // Zähle offene/geschlossene
+    // Count open/closed
     const openIssues = issues.filter(i => i.state === 'open').length;
     const closedIssues = issues.filter(i => i.state === 'closed').length;
     const openPRs = prs.filter(p => p.state === 'open').length;
@@ -1254,7 +1254,7 @@ function formatDuration(seconds) {
 function renderVisitorsChart(timeseries) {
     const chart = document.getElementById('visitors-chart');
     if (!chart || timeseries.length === 0) {
-        if (chart) chart.innerHTML = '<p class="text-gray-500 text-sm">Keine Daten verfügbar</p>';
+        if (chart) chart.innerHTML = '<p class="text-gray-500 text-sm">No data available</p>';
         return;
     }
     
@@ -1263,7 +1263,7 @@ function renderVisitorsChart(timeseries) {
     chart.innerHTML = timeseries.map(day => {
         const height = ((day.visitors || 0) / maxVisitors) * 100;
         const date = new Date(day.date);
-        const dayName = date.toLocaleDateString('de-DE', { weekday: 'short' });
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         return `
             <div class="flex-1 flex flex-col items-center">
                 <div class="w-full bg-green-500/20 rounded-t relative" style="height: ${Math.max(height, 5)}%">
@@ -1281,7 +1281,7 @@ function renderTopPages(pages) {
     if (!list) return;
     
     if (pages.length === 0) {
-        list.innerHTML = '<li class="text-gray-500">Keine Daten</li>';
+        list.innerHTML = '<li class="text-gray-500">No data</li>';
         return;
     }
     
@@ -1306,7 +1306,7 @@ function renderTopSources(sources) {
     if (!list) return;
     
     if (sources.length === 0) {
-        list.innerHTML = '<li class="text-gray-500">Keine Daten</li>';
+        list.innerHTML = '<li class="text-gray-500">No data</li>';
         return;
     }
     

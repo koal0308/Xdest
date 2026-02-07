@@ -260,13 +260,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validate file type
         const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
         if (!validTypes.includes(file.type)) {
-            alert('Bitte nur Bilder hochladen (PNG, JPG, GIF, WebP)');
+            alert('Please upload images only (PNG, JPG, GIF, WebP)');
             return;
         }
         
         // Validate file size (10MB)
         if (file.size > 10 * 1024 * 1024) {
-            alert('Die Datei ist zu groß. Maximal 10MB erlaubt.');
+            alert('File too large. Maximum 10MB allowed.');
             return;
         }
         
