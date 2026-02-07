@@ -61,7 +61,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
-                    Neues Issue
+                    New Issue
                 </a>
                 {% endif %}
             </div>
@@ -71,32 +71,32 @@
         <div class="flex flex-wrap gap-2 mb-6">
             <a href="/project/{{ project.id }}/issues" 
                class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-purple-600 text-white' if not current_status else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                Alle ({{ issue_counts.all }})
+                All ({{ issue_counts.all }})
             </a>
             <a href="/project/{{ project.id }}/issues?status=open" 
                class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-green-600 text-white' if current_status == 'open' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                🟢 Offen ({{ issue_counts.open }})
+                🟢 Open ({{ issue_counts.open }})
             </a>
             <a href="/project/{{ project.id }}/issues?status=in_progress" 
                class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-yellow-600 text-white' if current_status == 'in_progress' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                🔄 In Bearbeitung ({{ issue_counts.in_progress }})
+                🔄 In Progress ({{ issue_counts.in_progress }})
             </a>
             <a href="/project/{{ project.id }}/issues?status=resolved" 
                class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-blue-600 text-white' if current_status == 'resolved' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                ✅ Gelöst ({{ issue_counts.resolved }})
+                ✅ Resolved ({{ issue_counts.resolved }})
             </a>
             <a href="/project/{{ project.id }}/issues?status=closed" 
                class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-gray-600 text-white' if current_status == 'closed' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                ⬛ Geschlossen ({{ issue_counts.closed }})
+                ⬛ Closed ({{ issue_counts.closed }})
             </a>
         </div>
 
         <!-- Type Filter -->
         <div class="flex flex-wrap gap-2 mb-8 pb-6 border-b border-gray-800">
-            <span class="text-sm text-gray-500 py-2">Typ:</span>
+            <span class="text-sm text-gray-500 py-2">Type:</span>
             <a href="/project/{{ project.id }}/issues{{ '?status=' + current_status if current_status else '' }}" 
                class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ 'bg-purple-600/20 text-purple-400 border border-purple-600' if not current_type else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                Alle
+                All
             </a>
             <a href="/project/{{ project.id }}/issues?issue_type=bug{{ '&status=' + current_status if current_status else '' }}" 
                class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ 'bg-red-600/20 text-red-400 border border-red-600' if current_type == 'bug' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
@@ -108,7 +108,7 @@
             </a>
             <a href="/project/{{ project.id }}/issues?issue_type=question{{ '&status=' + current_status if current_status else '' }}" 
                class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ 'bg-blue-600/20 text-blue-400 border border-blue-600' if current_type == 'question' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                ❓ Frage
+                ❓ Question
             </a>
             <a href="/project/{{ project.id }}/issues?issue_type=security{{ '&status=' + current_status if current_status else '' }}" 
                class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ 'bg-orange-600/20 text-orange-400 border border-orange-600' if current_type == 'security' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
@@ -116,7 +116,7 @@
             </a>
             <a href="/project/{{ project.id }}/issues?issue_type=docs{{ '&status=' + current_status if current_status else '' }}" 
                class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ 'bg-cyan-600/20 text-cyan-400 border border-cyan-600' if current_type == 'docs' else 'bg-dark-300 text-gray-400 hover:text-white' }}">
-                📚 Dokumentation
+                📚 Documentation
             </a>
         </div>
 
@@ -152,7 +152,7 @@
                             {% elif issue.issue_type == 'feature' %}
                                 <span class="px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded-full">✨ Feature</span>
                             {% elif issue.issue_type == 'question' %}
-                                <span class="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded-full">❓ Frage</span>
+                                <span class="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded-full">❓ Question</span>
                             {% elif issue.issue_type == 'security' %}
                                 <span class="px-2 py-0.5 bg-orange-600/20 text-orange-400 text-xs rounded-full">🔒 Security</span>
                             {% elif issue.issue_type == 'docs' %}
@@ -170,7 +170,7 @@
                             <span>via {{ issue.source_platform }}</span>
                             <span>{{ issue.created_at.strftime('%d. %B %Y') }}</span>
                             <span class="flex items-center gap-1">
-                                💬 {{ issue.responses|length }} Antworten
+                                💬 {{ issue.responses|length }} Responses
                             </span>
                             {% if issue.github_issue_url %}
                             <a href="{{ issue.github_issue_url }}" target="_blank" 
@@ -195,18 +195,18 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
             </div>
-            <h3 class="text-xl font-semibold mb-2">Keine Issues</h3>
-            <p class="text-gray-400 mb-6">Es wurden noch keine Issues oder Verbesserungsvorschläge eingereicht.</p>
+            <h3 class="text-xl font-semibold mb-2">No Issues</h3>
+            <p class="text-gray-400 mb-6">No issues or feature requests have been submitted yet.</p>
             {% if user %}
             <a href="/project/{{ project.id }}/issues/new" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition font-semibold">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
-                Erstes Issue erstellen
+                Create First Issue
             </a>
             {% else %}
             <a href="/auth/github" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
-                Anmelden um Issue zu erstellen
+                Sign in to create an issue
             </a>
             {% endif %}
         </div>

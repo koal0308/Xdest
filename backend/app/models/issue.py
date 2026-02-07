@@ -39,7 +39,7 @@ class Issue(Base):
     github_issue_url = Column(String(500), nullable=True)  # Link zum GitHub Issue
     
     # Referenz zur Quelle
-    source_platform = Column(String(100), default="dest.com")  # Woher kommt das Issue
+    source_platform = Column(String(100), default="Xdest")  # Woher kommt das Issue
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

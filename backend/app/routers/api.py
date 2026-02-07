@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import User, Project, Post, Comment, Issue, IssueResponse, ResponseVote
 from app.dependencies import get_current_user
 from app.config import settings
+from app.encryption import decrypt_token, encrypt_token
 import os
 import uuid
 from datetime import datetime
@@ -41,7 +42,6 @@ async def ensure_label_exists(
     }
     
     async with httpx.AsyncClient() as client:
-        # Versuche Label zu erstellen
         response = await client.post(url, headers=headers, json=label_info)
         # 201 = erstellt, 422 = existiert bereits (beides okay)
         return response.status_code in [201, 422]
@@ -72,10 +72,7 @@ async def create_github_issue(
         response = await client.post(url, headers=headers, json=data)
         if response.status_code == 201:
             return response.json()
-        else:
-            # Log error but don't fail the request
-            print(f"GitHub Issue creation failed: {response.status_code} - {response.text}")
-            return None
+        return None
 
 def parse_github_url(github_url: str) -> tuple:
     """Extrahiert owner und repo name aus einer GitHub URL"""
@@ -86,6 +83,18 @@ def parse_github_url(github_url: str) -> tuple:
     if match:
         return match.group(1), match.group(2)
     return None, None
+
+def get_decrypted_github_token(user) -> str:
+    """Entschlüsselt den GitHub Token eines Users"""
+    if not user or not user.github_token:
+        return ""
+    return decrypt_token(user.github_token)
+
+def get_decrypted_plausible_key(project) -> str:
+    """Entschlüsselt den Plausible API Key eines Projekts"""
+    if not project or not project.plausible_api_key:
+        return ""
+    return decrypt_token(project.plausible_api_key)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
@@ -142,7 +151,7 @@ async def create_project(
         tags=tags if tags else None,
         google_analytics_id=google_analytics_id if google_analytics_id else None,
         plausible_domain=plausible_domain if plausible_domain else None,
-        plausible_api_key=plausible_api_key if plausible_api_key else None,
+        plausible_api_key=encrypt_token(plausible_api_key) if plausible_api_key else None,
         image=image_url
     )
     db.add(project)
@@ -186,9 +195,9 @@ async def edit_project(
     project.tags = tags if tags else None
     project.google_analytics_id = google_analytics_id if google_analytics_id else None
     project.plausible_domain = plausible_domain if plausible_domain else None
-    # Only update API key if provided (don't overwrite with empty)
+    # Only update API key if provided (don't overwrite with empty) - encrypt it
     if plausible_api_key:
-        project.plausible_api_key = plausible_api_key
+        project.plausible_api_key = encrypt_token(plausible_api_key)
     
     # Handle image
     if remove_image == "1":
@@ -334,14 +343,15 @@ async def get_user_github_repos(request: Request, db: Session = Depends(get_db))
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    if not user.github_token:
+    github_token = get_decrypted_github_token(user)
+    if not github_token:
         raise HTTPException(status_code=400, detail="GitHub not connected. Please login with GitHub first.")
     
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             "https://api.github.com/user/repos",
             headers={
-                "Authorization": f"Bearer {user.github_token}",
+                "Authorization": f"Bearer {github_token}",
                 "Accept": "application/vnd.github.v3+json"
             },
             params={"per_page": 100, "sort": "updated"}
@@ -401,24 +411,31 @@ async def get_project_analytics(project_id: int, request: Request, db: Session =
     if not project.plausible_domain or not project.plausible_api_key:
         return {"error": "no_analytics", "message": "Plausible not configured"}
     
+    # Entschlüssele den API Key
+    plausible_key = get_decrypted_plausible_key(project)
+    if not plausible_key:
+        return {"error": "no_analytics", "message": "Plausible API key invalid"}
+    
     try:
         async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {project.plausible_api_key}"}
+            headers = {"Authorization": f"Bearer {plausible_key}"}
             base_url = "https://plausible.io/api/v1/stats"
             
             # Realtime visitors
             realtime_resp = await client.get(
                 f"{base_url}/realtime/visitors",
-                params={"site_id": project.plausible_domain},
+                params={"site_id": str(project.plausible_domain)},
                 headers=headers
             )
             realtime = realtime_resp.json() if realtime_resp.status_code == 200 else 0
+            
+            plausible_domain = str(project.plausible_domain)
             
             # Aggregate stats (last 30 days)
             aggregate_resp = await client.get(
                 f"{base_url}/aggregate",
                 params={
-                    "site_id": project.plausible_domain,
+                    "site_id": plausible_domain,
                     "period": "30d",
                     "metrics": "visitors,pageviews,bounce_rate,visit_duration"
                 },
@@ -430,7 +447,7 @@ async def get_project_analytics(project_id: int, request: Request, db: Session =
             timeseries_resp = await client.get(
                 f"{base_url}/timeseries",
                 params={
-                    "site_id": project.plausible_domain,
+                    "site_id": plausible_domain,
                     "period": "7d",
                     "metrics": "visitors,pageviews"
                 },
@@ -442,7 +459,7 @@ async def get_project_analytics(project_id: int, request: Request, db: Session =
             pages_resp = await client.get(
                 f"{base_url}/breakdown",
                 params={
-                    "site_id": project.plausible_domain,
+                    "site_id": plausible_domain,
                     "period": "30d",
                     "property": "event:page",
                     "limit": "5"
@@ -455,7 +472,7 @@ async def get_project_analytics(project_id: int, request: Request, db: Session =
             sources_resp = await client.get(
                 f"{base_url}/breakdown",
                 params={
-                    "site_id": project.plausible_domain,
+                    "site_id": plausible_domain,
                     "period": "30d",
                     "property": "visit:source",
                     "limit": "5"
@@ -470,7 +487,7 @@ async def get_project_analytics(project_id: int, request: Request, db: Session =
                 "timeseries": timeseries,
                 "top_pages": pages,
                 "top_sources": sources,
-                "domain": project.plausible_domain
+                "domain": plausible_domain
             }
             
     except Exception as e:
@@ -490,8 +507,9 @@ async def get_github_repo_info(repo_url: str, request: Request, db: Session = De
         raise HTTPException(status_code=400, detail="Invalid repo URL")
     
     headers = {"Accept": "application/vnd.github.v3+json"}
-    if user and user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user) if user else ""
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Basic repo info
@@ -568,8 +586,9 @@ async def get_github_repo_commits(
         raise HTTPException(status_code=400, detail="Invalid repo URL")
     
     headers = {"Accept": "application/vnd.github.v3+json"}
-    if user and user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user) if user else ""
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         commits_resp = await client.get(
@@ -621,8 +640,9 @@ async def get_github_repo_contributors(
         raise HTTPException(status_code=400, detail="Invalid repo URL")
     
     headers = {"Accept": "application/vnd.github.v3+json"}
-    if user and user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user) if user else ""
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Get contributors
@@ -666,8 +686,9 @@ async def get_github_repo_activity(
         raise HTTPException(status_code=400, detail="Invalid repo URL")
     
     headers = {"Accept": "application/vnd.github.v3+json"}
-    if user and user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user) if user else ""
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Get recent events/activity
@@ -814,13 +835,14 @@ async def create_issue(
     github_issue_url = None
     
     # Wenn GitHub Sync aktiviert und Projekt hat GitHub Repo
-    if sync_to_github and project.github_url and user.github_token:
-        repo_owner, repo_name = parse_github_url(project.github_url)
+    github_token = get_decrypted_github_token(user)
+    if sync_to_github and project.github_url and github_token:
+        repo_owner, repo_name = parse_github_url(str(project.github_url))
         if repo_owner and repo_name:
             # Issue Body für GitHub formatieren
             github_body = f"{description}\n\n"
             github_body += "---\n"
-            github_body += f"📍 *Gemeldet über [dest.com]({settings.APP_URL})*\n"
+            github_body += f"📍 *Reported via [Xdest]({settings.APP_URL})*\n"
             github_body += f"👤 Reporter: @{user.username}\n"
             
             # Screenshot einbetten wenn vorhanden
@@ -834,7 +856,7 @@ async def create_issue(
             if label_info:
                 # Erstelle Label falls es nicht existiert
                 await ensure_label_exists(
-                    github_token=user.github_token,
+                    github_token=github_token,
                     repo_owner=repo_owner,
                     repo_name=repo_name,
                     label_info=label_info
@@ -843,7 +865,7 @@ async def create_issue(
             
             # GitHub Issue erstellen
             github_result = await create_github_issue(
-                github_token=user.github_token,
+                github_token=github_token,
                 repo_owner=repo_owner,
                 repo_name=repo_name,
                 title=title,
@@ -863,7 +885,7 @@ async def create_issue(
         screenshot=screenshot_url,
         issue_type=issue_type,
         status="open",
-        source_platform="dest.com",
+        source_platform="Xdest",
         github_issue_number=github_issue_number,
         github_issue_url=github_issue_url
     )
@@ -1239,7 +1261,7 @@ async def sync_github_issues(
         return JSONResponse({"synced": 0, "message": "No GitHub repo connected"})
     
     # Parse GitHub URL
-    repo_owner, repo_name = parse_github_url(project.github_url)
+    repo_owner, repo_name = parse_github_url(str(project.github_url))
     if not repo_owner or not repo_name:
         return JSONResponse({"synced": 0, "message": "Invalid GitHub URL"})
     
@@ -1253,8 +1275,9 @@ async def sync_github_issues(
         return JSONResponse({"synced": 0, "message": "No linked GitHub issues"})
     
     headers = {"Accept": "application/vnd.github.v3+json"}
-    if user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user)
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     synced_count = 0
     reactions_updated = 0
@@ -1317,15 +1340,16 @@ async def get_github_reactions(
     if not project or not project.github_url:
         return JSONResponse({"reactions": {}, "total": 0})
     
-    repo_owner, repo_name = parse_github_url(project.github_url)
+    repo_owner, repo_name = parse_github_url(str(project.github_url))
     if not repo_owner or not repo_name:
         return JSONResponse({"reactions": {}, "total": 0})
     
     headers = {
         "Accept": "application/vnd.github.v3+json"
     }
-    if user and user.github_token:
-        headers["Authorization"] = f"Bearer {user.github_token}"
+    github_token = get_decrypted_github_token(user) if user else ""
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:

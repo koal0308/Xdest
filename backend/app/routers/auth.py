@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models.user import User
 from app.auth import oauth
 from app.config import settings
+from app.encryption import encrypt_token
 import httpx
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -58,7 +59,7 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
             email=primary_email or github_user.get('email', f"{github_user['id']}@github.local"),
             avatar=github_user.get('avatar_url'),
             github=github_user.get('html_url'),
-            github_token=token['access_token'],
+            github_token=encrypt_token(token['access_token']),
             bio=github_user.get('bio'),
             provider="github",
             provider_id=str(github_user['id']),
@@ -69,7 +70,7 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
         db.refresh(user)
     else:
         # Update token for existing user
-        user.github_token = token['access_token']
+        user.github_token = encrypt_token(token['access_token'])
         db.commit()
     
     # Set session
